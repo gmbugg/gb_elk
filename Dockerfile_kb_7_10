@@ -1,0 +1,60 @@
+FROM centos:7
+#Dockerfile for kibana
+
+USER root
+
+RUN \
+  yum update -y --quiet && \
+  yum install -y --quiet wget && \
+  yum install -y --quiet tar && \
+  yum install -y --quiet which && \
+  yum install -y --quiet java-1.8.0-openjdk && \
+  yum install -y --quiet java-1.8.0-openjdk-devel
+
+# Add a kibana user that KB will actually run as.
+RUN groupadd -g 1000 kibana && \
+    adduser -u 1000 -g 1000 -d /usr/share/kibana kibana
+WORKDIR /usr/share/kibana
+
+# Set up /local for the KB binaries and data.
+RUN \
+  mkdir -p /local/kibana && \
+  chown kibana:kibana /local/kibana && \
+  mkdir -p /local/data && \
+  chown kibana:kibana /local/data
+
+# Switch to the LS user. None of the rest needs root access.
+USER kibana
+
+# Set some ENV variables to cut down on the typos.
+ENV KB_HOME /local/kibana
+ENV KB_CONFIG /local/kibana/config/kibana.yml
+
+# Pull Kibana down from ES.org, expand it and move it into place
+#https://artifacts.elastic.co/downloads/kibana/kibana-7.10.0-linux-x86_64.tar.gz
+#https://artifacts.elastic.co/downloads/kibana-oss/kibana-oss-7.10.0-linux-x86_64.tar.gz
+RUN \
+  cd /tmp && \
+  wget --quiet https://artifacts.elastic.co/downloads/kibana/kibana-oss-7.10.0-linux-x86_64.tar.gz && \
+  tar xfz kibana-oss-7.10.0-linux-x86_64.tar.gz && \
+  rm -f kibana-oss-7.10.0-linux-x86_64.tar.gz && \
+  mv /tmp/kibana-7.10.0/* /local/kibana
+
+VOLUME ["/local/data"]
+
+# Define the LS config to point our data to the volume.
+RUN \
+  mkdir -p $KB_HOME/config && \
+  touch $KB_CONFIG && \
+  printf "path:\n" >> $KB_CONFIG && \
+  printf "  data: /local/data/data\n" >> $KB_CONFIG && \
+  printf "  logs: /local/data/logs\n" >> $KB_CONFIG && \
+  printf "  plugins: /local/data/plugins\n" >> $KB_CONFIG && \
+  printf "  work: /local/data/work\n" >> $KB_CONFIG
+
+
+# Ports to expose
+EXPOSE 5601
+
+# What we run by default
+CMD bin/kibana -f kibana.conf
