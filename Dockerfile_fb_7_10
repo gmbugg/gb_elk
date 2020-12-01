@@ -1,0 +1,54 @@
+FROM centos:7
+#Dockerfile for filebeat
+#filebeat runs as root
+USER root
+
+RUN \
+  yum update -y --quiet && \
+  yum install -y --quiet wget && \
+  yum install -y --quiet tar && \
+  yum install -y --quiet which && \
+
+WORKDIR /usr/share/filebeat
+
+# Set up /local for the KB binaries and data.
+RUN \
+  mkdir -p /usr/share/filebeat && \
+  chown root:root /usr/share/filebeat && \
+  mkdir -p /usr/share/filebeat/data && \
+  chown root:root /usr/share/filebeat/data && \
+  mkdir -p /usr/share/filebeat/logs && \
+  chown root:root /usr/share/filebeat/logs
+
+# Set some ENV variables to cut down on the typos.
+ENV FB_HOME /usr/share/filebeat
+ENV FB_CONFIG /usr/share/filebeat/filebeat.yml
+
+# Pull Filebeat down from ES.org, expand it and move it into place
+#curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.10.0-linux-x86_64.tar.gz
+#tar xzvf filebeat-7.10.0-linux-x86_64.tar.gz
+RUN \
+  cd /tmp && \
+  wget --quiet https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-oss-7.10.0-linux-x86_64.tar.gz && \
+  tar xfz filebeat-oss-7.10.0-linux-x86_64.tar.gz && \
+  rm -f filebeat-oss-7.10.0-linux-x86_64.tar.gz && \
+  mv /tmp/filebeat-7.10.0/* /usr/share/filebeat
+
+VOLUME ["/local/data"]
+
+# Define the LS config to point our data to the volume.
+RUN \
+  mkdir -p $KB_HOME/config && \
+  touch $KB_CONFIG && \
+  printf "path:\n" >> $KB_CONFIG && \
+  printf "  data: /local/data/data\n" >> $KB_CONFIG && \
+  printf "  logs: /local/data/logs\n" >> $KB_CONFIG && \
+  printf "  plugins: /local/data/plugins\n" >> $KB_CONFIG && \
+  printf "  work: /local/data/work\n" >> $KB_CONFIG
+
+
+# Ports to expose
+EXPOSE 5601
+
+# What we run by default
+CMD filebeat -f filebeat.conf
