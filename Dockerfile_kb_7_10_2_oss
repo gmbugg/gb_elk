@@ -1,0 +1,31 @@
+FROM centos:7
+#Dockerfile for kibana 7.10.2 oss version
+
+USER root
+
+RUN \
+  yum -y update && \
+  yum -y install wget && \
+  yum -y install tar && \
+  yum -y install which && \
+  yum -y remove bind-license
+
+# Add a kibana user that KB will actually run as.
+RUN groupadd -g 1000 kibana && \
+    adduser -u 1000 -g 1000 -d /usr/share/kibana kibana
+WORKDIR /usr/share/kibana
+
+USER kibana
+
+RUN \
+  cd /tmp && \
+  wget https://artifacts.elastic.co/downloads/kibana/kibana-oss-7.10.2-linux-x86_64.tar.gz && \
+  tar xfz kibana-oss-7.10.2-linux-x86_64.tar.gz && \
+  rm -f kibana-oss-7.10.2-linux-x86_64.tar.gz && \
+  mv /tmp/kibana-7.10.2-linux-x86_64/* /usr/share/kibana
+
+# Ports to expose
+EXPOSE 5601
+
+# What we run by default
+CMD ["/usr/share/kibana/bin/kibana"]

@@ -1,0 +1,56 @@
+FROM centos:7
+#Dockerfile for logstash 7.10.2 oss version
+
+USER root
+
+RUN \
+  yum -y update && \
+  yum -y install wget && \
+  yum -y install tar && \
+  yum -y install which && \
+  yum -y remove bind-license
+#  yum -y install java-1.8.0-openjdk && \
+#  yum -y install java-1.8.0-openjdk-devel
+
+# Add a logstash user that LS will actually run as.
+RUN groupadd -g 1000 logstash && \
+    adduser -u 1000 -g 1000 -d /usr/share/logstash logstash
+WORKDIR /usr/share/logstash
+
+# Switch to the LS user. None of the rest needs root access.
+USER logstash
+
+# Set some ENV variables to cut down on the typos.
+ENV LS_HOME /usr/share/logstash
+ENV LS_CONFIG /usr/share/logstash/config/logstash.yml
+
+# Pull Logstash down from ES.org, expand it and move it into place
+RUN \
+  cd /tmp && \
+  wget https://artifacts.elastic.co/downloads/logstash/logstash-oss-7.10.2-linux-x86_64.tar.gz && \
+  tar xfz logstash-oss-7.10.2-linux-x86_64.tar.gz && \
+  rm -f logstash-oss-7.10.2-linux-x86_64.tar.gz && \
+  mv /tmp/logstash-7.10.2/* /usr/share/logstash && \
+  mkdir -p /usr/share/logstash/pipeline && \
+  chown logstash:logstash /usr/share/logstash/pipeline && \
+  mkdir -p /usr/share/logstash/data/plugins && \
+  chown logstash:logstash /usr/share/logstash/data/plugins && \
+  rm -f /usr/share/logstash/config/logstash-sample.conf
+##  mkdir /var/log/logstash && \
+##  chown logstash:logstash /var/log/logstash && \
+# install this after making image
+#  bin/logstash-plugin install logstash-filter-truncate
+
+# Define the LS config to point our data to the volume.
+RUN \
+  printf "path:\n" >> $LS_CONFIG && \
+  printf "  data: /usr/share/logstash/data\n" >> $LS_CONFIG && \
+  printf "  logs: /var/log/logstash\n" >> $LS_CONFIG && \
+  printf "  config: /usr/share/logstash/config\n" >> $LS_CONFIG && \
+  printf "  plugins: /usr/share/logstash/data/plugins\n" >> $LS_CONFIG
+
+# Ports to expose
+EXPOSE 5044
+
+# What we run by default
+CMD ["/usr/share/logstash/bin/logstash"]
